@@ -1,0 +1,12 @@
+name: StressManagement_Sham
+title: StressManagement_Sham
+username: robindevillersntnu-phd
+account: robindevillersntnu-phd
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13007375
+bundleId: 9219787
+url: https://robindevillersntnu-phd.shinyapps.io/StressManagement_Sham/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
