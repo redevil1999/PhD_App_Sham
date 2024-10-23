@@ -76,9 +76,9 @@ server <- function(input, output, session) {
     
     navbarPage('NTNU',
                tabPanel('Coherence Breathing',
-                        sidebarLayout(
-                          sidebarPanel(paste("Hello", credentials()$info$name, "Welcome to the guided breathing! The pace of this breathing is set to what was measured in the lab. Remember to inhale as the circle expands and exhale as it contracts."),
-                          ),
+                        paste("Hello", credentials()$info$name, "Welcome to the guided breathing!"),
+                        p("The pace of this breathing is set to what was measured in the lab."),
+                        p("Remember to inhale as the circle expands and exhale as it contracts."),
                           mainPanel(plotOutput("distPlot"),
                                     hr(),
                                     actionButton('start', 'Start'),
@@ -86,7 +86,7 @@ server <- function(input, output, session) {
                                     actionButton('reset', 'Reset'),
                                     numericInput('minutes', 'Minutes:', value = default_breathingtime, min = 0, max = 99999, step = 1),
                                     textOutput('timeleft'),
-                                    paste("If you would like to change the duration, remember to press reset after entering a different number."))
+                                    paste("If you would like to change the duration, remember to press reset after entering a different number.")
                         )
                ),
                tabPanel('Session Completion',
