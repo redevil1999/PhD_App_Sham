@@ -6,33 +6,63 @@ library(gifski)
 library(lubridate)
 library(shinyauthr)
 library(rsconnect)
+library(googlesheets4)
+library(googledrive)
+library(viridis)
 
-# dataframe that holds usernames, passwords, and other user data
-user_base <- tibble::tibble(
-  user = c("user1", "user2"),
-  password = sapply(c("pass1", "pass2"), sodium::password_store),
-  permissions = c("admin", "standard"),
-  name = c("User One", "User Two"),
-  breathing_duration = c(10, 15)
+# interactive, generates token
+#options(gargle_oauth_cache = ".secrets")
+#googledrive::drive_auth()
+
+# non-interactive
+googledrive::drive_auth(cache = ".secrets", email = "re.devillers1999@gmail.com")
+googlesheets4::gs4_auth(token = drive_token(), email = TRUE)
+
+# Load existing user data from Google Sheet
+user_data_from_google <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1XKnyX0lrGj2I8563VSq_aRqjuLdFXT5cKMVT5mQ3-DE/edit?usp=sharing",
+  sheet = "Users",
+  col_names = TRUE
 )
 
-# Save session data function
-saveSessionData <- function(data) {
-  write.csv(data, file = "session_data.csv", row.names = FALSE)
-}
+# Convert passwords to hashed versions if they are plain text
+user_base <- tibble::tibble(
+  user = user_data_from_google$user,
+  password = sapply(user_data_from_google$password, sodium::password_store), # Hashes passwords
+  permissions = user_data_from_google$permissions,
+  name = user_data_from_google$name,
+  breathing_duration = user_data_from_google$breathing_duration
+)
 
-# Load existing session data from CSV if the file exists
-if (file.exists("session_data.csv")) {
-  session_tracker <- read.csv("session_data.csv", stringsAsFactors = FALSE)
-  session_tracker <- as_tibble(session_tracker)  # Ensure it's a tibble for consistency
-} else {
-  # Initialize session tracker if no file exists
-  session_tracker <- tibble::tibble(
-    user = user_base$user,
-    completed_sessions = rep(0, length(user_base$user)),
-    total_time_spent = rep(0, length(user_base$user))
+# New save session data functions
+# Function to append session data to Google Sheet
+saveSessionData <- function(user, session_duration, total_time_spent, completed_sessions, session_started) {
+  new_row <- data.frame(
+    user = user,
+    session_duration = session_duration / 60,  # Convert to minutes
+    total_time_spent = total_time_spent / 60,  # Convert to minutes
+    completed_sessions = completed_sessions,
+    session_started = session_started,
+    timestamp = Sys.time()  # Add a timestamp for when the session was completed
+  )
+  
+  # Append the new row to the Google Sheet
+  sheet_append(
+    ss = "https://docs.google.com/spreadsheets/d/1XKnyX0lrGj2I8563VSq_aRqjuLdFXT5cKMVT5mQ3-DE/edit?usp=sharing", 
+    data = new_row,
+    sheet = "Data"
   )
 }
+
+# # Save session data function
+# saveSessionData <- function(data) {
+#   data <- data.frame(data)
+#   sheet_append(data, ss = "https://docs.google.com/spreadsheets/d/1ZfrZlrSlvWupOObvCFwWH06nULWElCXzHnxBbBqTfeU/edit?usp=sharing", sheet = "Data")
+# }
+
+# Load existing session data from Google
+session_tracker <- read_sheet(ss = "https://docs.google.com/spreadsheets/d/1XKnyX0lrGj2I8563VSq_aRqjuLdFXT5cKMVT5mQ3-DE/edit?usp=sharing", sheet = "Data", col_names = TRUE)
+session_tracker <- as_tibble(session_tracker)  # Ensure it's a tibble for consistency
 
 length_42 <- c(seq(0.2, 10, by = 0.5), 10, 10, rev(seq(0.2, 10, by = 0.5)))
 length_22 <-  c(seq(0.2, 10, by = 1), 10, 10, rev(seq(0.2, 10, by = 1)))
@@ -67,7 +97,7 @@ server <- function(input, output, session) {
   )
   
   # Default breathing time
-  default_breathingtime <- 5
+  default_sessiontime <- 5
   
   # UI for logged-in users
   output$sidebarpanel <- renderUI({
@@ -84,7 +114,7 @@ server <- function(input, output, session) {
                                     actionButton('start', 'Start'),
                                     actionButton('stop', 'Stop'),
                                     actionButton('reset', 'Reset'),
-                                    numericInput('minutes', 'Minutes:', value = default_breathingtime, min = 0, max = 99999, step = 1),
+                                    numericInput('minutes', 'Minutes:', value = default_sessiontime, min = 0, max = 99999, step = 1),
                                     textOutput('timeleft'),
                                     paste("If you would like to change the duration, remember to press reset after entering a different number.")
                         )
@@ -97,9 +127,10 @@ server <- function(input, output, session) {
   })
   
   # Create Timer
-  timer <- reactiveVal(default_breathingtime * 60)
+  timer <- reactiveVal(default_sessiontime * 60)
   active <- reactiveVal(FALSE)
   session_start_time <- reactiveVal(0)  # Store the initial time when user starts
+  session_started <- reactiveVal(FALSE) # Initialize session_started variable
   
   # Time left output
   output$timeleft <- renderText({
@@ -110,6 +141,7 @@ server <- function(input, output, session) {
   observeEvent(input$start, {
     session_start_time(timer())  # Store initial time
     active(TRUE)  # Start timer
+    session_started(TRUE) #add a start variable for the fact that they started a session
   })
   
   # Observer for countdown and session tracking
@@ -122,24 +154,33 @@ server <- function(input, output, session) {
           active(FALSE)
           showModal(modalDialog(
             title = "Important message",
-            "Countdown completed!"
+            "Session completed! The session tracker will update with the next login."
           ))
           
           # Get logged-in user's index
           user_index <- which(session_tracker$user == credentials()$info$user)
           
-          # Calculate session duration
+          # Calculate session duration (in seconds)
           session_duration <- session_start_time() - timer()
           
-          # Update session tracker
-          session_tracker$completed_sessions[user_index] <- session_tracker$completed_sessions[user_index] + 1
-          session_tracker$total_time_spent[user_index] <- (session_tracker$total_time_spent[user_index] + session_duration) / 60
+          # Update session tracker values for the user
+          completed_sessions <- 1
+          total_time_spent <- session_duration
           
-          # Save updated session data
-          saveSessionData(session_tracker)
           
-          # print for debugging
+          # Extract relevant session data
+          user <- credentials()$info$user
+          # total_time_spent <- session_tracker$total_time_spent[user_index]
+          # completed_sessions <- session_tracker$completed_sessions[user_index]
+          
+          # Save the updated session data as a new row in the Google Sheet, including if the session was started
+          saveSessionData(user, session_duration, total_time_spent, completed_sessions, session_started())
+          
+          # Print for debugging
           print(session_tracker)
+          
+          # Reset session started status
+          session_started(FALSE) 
         }
       }
     })
@@ -147,12 +188,30 @@ server <- function(input, output, session) {
   
   # Render session count for logged-in user
   output$session_count <- renderTable({
-    req(credentials()$user_auth)
+    req(credentials()$user_auth)  # Ensure user is authenticated
     
-    # Filter session tracker for logged-in user
-    session_tracker %>%
-      filter(user == credentials()$info$user) %>%
-      mutate(total_time_spent = total_time_spent / 60)  # Convert seconds to period
+    # Retrieve user data from session tracker
+    user_data <- session_tracker %>%
+      filter(user == credentials()$info$user)
+    
+    # Check if the user exists in the session tracker
+    if (nrow(user_data) > 0) {
+      # If the user exists, extract total_time_spent and completed_sessions
+      total_time_spent <- sum(user_data$session_duration)
+      completed_sessions <- sum(user_data$completed_sessions)
+    } else {
+      # If user doesn't exist, set default values
+      total_time_spent <- 0
+      completed_sessions <- 0
+      
+    }
+    
+    # Create a summary table to display user session data
+    tibble(
+      User = credentials()$info$user,
+      Total_Time_Spent_Minutes = total_time_spent,  # Convert seconds to minutes
+      Completed_Sessions = completed_sessions
+    )
   })
   
   # Action button observers
@@ -171,6 +230,7 @@ server <- function(input, output, session) {
     # make the animation
     Breathing_Circle <- ggplot() +
       geom_circle(data = breathing_circle_data, mapping = aes(x0 = x0, y0 = y0, r = r, col = r, fill = r), show.legend = FALSE) +
+      scale_fill_viridis(option = "D") +
       theme(axis.line=element_blank(),axis.text.x=element_blank(),
             axis.text.y=element_blank(),axis.ticks=element_blank(),
             axis.title.x=element_blank(),
