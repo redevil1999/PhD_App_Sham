@@ -1,0 +1,12 @@
+name: StressManagement_S
+title: StressManagement_S
+username: robindevillersntnu-phd
+account: robindevillersntnu-phd
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13130158
+bundleId: 9268341
+url: https://robindevillersntnu-phd.shinyapps.io/StressManagement_S/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
