@@ -97,7 +97,7 @@ server <- function(input, output, session) {
   )
   
   # Default breathing time
-  default_sessiontime <- 5
+  default_sessiontime <- 10
   
   # UI for logged-in users
   output$sidebarpanel <- renderUI({
@@ -106,9 +106,9 @@ server <- function(input, output, session) {
     
     navbarPage('NTNU',
                tabPanel('Coherence Breathing',
-                        paste("Hello", credentials()$info$name, "Welcome to the guided breathing!"),
-                        p("The pace of this breathing is set to what was measured in the lab."),
-                        p("Remember to inhale as the circle expands and exhale as it contracts."),
+                        paste("Hello", credentials()$info$name, "Welcome to the stress management app!"),
+                        p("Remember to pay close attention to the circle."),
+                        p("Try to notice changes in any aspect, for example speed or colour."),
                           mainPanel(plotOutput("distPlot"),
                                     hr(),
                                     actionButton('start', 'Start'),

@@ -7,7 +7,7 @@ library(rsconnect)
 
 
 ui <- fluidPage(
-  titlePanel('Stress Management Tool_Sham'),
+  titlePanel('Stress Management Tool'),
   theme = shinytheme('cyborg'),
   
   # logout button
