@@ -10,11 +10,11 @@ ui <- fluidPage(
   titlePanel('Stress Management Tool'),
   theme = shinytheme('cyborg'),
   
-  # logout button
-  div(class = "pull-right", shinyauthr::logoutUI(id = "logout")),
-  
-  # login section
-  shinyauthr::loginUI(id = "login"),
+  # # logout button
+  # div(class = "pull-right", shinyauthr::logoutUI(id = "logout")),
+  # 
+  # # login section
+  # shinyauthr::loginUI(id = "login"),
   
   # Sidebar to show user info after login
   uiOutput("sidebarpanel")
