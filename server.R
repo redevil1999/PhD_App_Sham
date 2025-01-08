@@ -91,7 +91,7 @@ server <- function(input, output, session) {
       
       navbarPage('NTNU',
                  tabPanel('Relaxation',
-                          paste("Hello!", "Welcome to the relaxation practice!"),
+                          paste("Hello!", "Welcome to the relaxation practice!The website is a little slow, so please be patient."),
                           p("Pay attention to the colours, sizes and speed of the orb."),
                           mainPanel(plotOutput("distPlot"),
                                     hr(),
